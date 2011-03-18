@@ -90,7 +90,8 @@ uint8_t i2c_send_nack(void) {
 int main(void)
 {
 	uint8_t err;
-	int8_t temp;
+	int16_t tempr;
+	float temp;
 	char *string;
 
 	string = malloc(80);
@@ -105,6 +106,7 @@ int main(void)
 
 	while(1) {
 		temp = -99;
+		tempr = -99;
 		loop_until_bit_is_clear(PINA, PA0);
 		uart_printstrn(0, "click");
 
@@ -128,10 +130,15 @@ int main(void)
 				err = i2c_send_sla_r();
 
 			if (err == TW_MR_SLA_ACK)
+				err = i2c_send_ack();
+
+			if (err == TW_MR_DATA_ACK) {
+				tempr = TWDR << 8;
 				err = i2c_send_nack();
+			}
 
 			if (err == TW_MR_DATA_NACK) {
-				temp = TWDR;
+				tempr |= TWDR;
 			} else {
 				uart_printstrn(0, "ERR: recv DATA!");
 			}
@@ -140,7 +147,11 @@ int main(void)
 		}
 
 		i2c_send_stop();
-		string = itoa(temp, string, 10);
+
+		temp = tempr/256;
+		string = itoa(tempr, string, 10);
+		uart_printstrn(0, string);
+		string = dtostrf(temp, 3, 5, string);
 		uart_printstrn(0, string);
 		string = itoa(err, string, 16);
 		uart_printstrn(0, string);
