@@ -15,148 +15,52 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <inttypes.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <avr/io.h>
 #include <util/delay.h>
-#include <util/twi.h>
+#include "tcn75.h"
 #include "uart.h"
-
-/*
-PC0 SCL
-PC1 SDA
-PC2 IN ALLERT
-PC3 - 5 OUT A0 - 2
-*/
-
-#define ADDR_W 0x9e /* 1001000 0 */
-#define ADDR_R 0x9f /* 1001000 1 */
-
-uint8_t i2c_send_start(void) {
-	/* send start condition */
-	TWCR = _BV(TWINT) | _BV(TWSTA) | _BV(TWEN);
-	/* wait for transmission */
-	loop_until_bit_is_set(TWCR, TWINT);
-	return(TW_STATUS);
-}
-
-void i2c_send_stop(void) {
-	/* send stop condition */
-	TWCR = _BV(TWINT) | _BV(TWSTO) | _BV(TWEN);
-}
-
-uint8_t i2c_send_sla_w(void) {
-	TWDR = ADDR_W;
-	/* clear interrupt to start transmission */
-	TWCR = _BV(TWINT) | _BV(TWEN); 
-	/* wait for transmission */
-	loop_until_bit_is_set(TWCR, TWINT);
-	return(TW_STATUS);
-}
-
-uint8_t i2c_send_sla_r(void) {
-	TWDR = ADDR_R;
-	/* clear interrupt to start transmission */
-	TWCR = _BV(TWINT) | _BV(TWEN); 
-	/* wait for transmission */
-	loop_until_bit_is_set(TWCR, TWINT);
-	return(TW_STATUS);
-}
-
-uint8_t i2c_send_data(const uint8_t data) {
-	TWDR = data;
-	/* clear interrupt to start transmission */
-	TWCR = _BV(TWINT) | _BV(TWEN); 
-	/* wait for transmission */
-	loop_until_bit_is_set(TWCR, TWINT);
-	return(TW_STATUS);
-}
-
-uint8_t i2c_send_ack(void) {
-	TWCR = _BV(TWINT) | _BV(TWEN) | _BV(TWEA);
-	/* wait for transmission */
-	loop_until_bit_is_set(TWCR, TWINT);
-	return(TW_STATUS);
-}
-
-uint8_t i2c_send_nack(void) {
-	TWCR = _BV(TWINT) | _BV(TWEN);
-	/* wait for transmission */
-	loop_until_bit_is_set(TWCR, TWINT);
-	return(TW_STATUS);
-}
 
 int main(void)
 {
-	uint8_t err;
-	int16_t tempr;
 	float temp;
+	uint8_t cfg;
 	char *string;
 
 	string = malloc(80);
 
 	DDRA = 0;
-	DDRC = _BV(3) | _BV(4) | _BV(5);
-	PORTC = _BV(3) | _BV(4) | _BV(5);
-	TWSR = 3;
-	TWBR = 32;
+	tcn75_init();
 	uart_init(0);
 	uart_printstrn(0, "begin");
 
 	while(1) {
-		temp = -99;
-		tempr = -99;
 		loop_until_bit_is_clear(PINA, PA0);
 		uart_printstrn(0, "click");
 
-		/* Send ADDR_W reg. 0 req. */
-		err = i2c_send_start();
+		cfg = 255;
 
-		if (err == TW_START)
-			err = i2c_send_sla_w();
-		else
-			uart_printstrn(0, "ERR: send start!");
-
-		if (err == TW_MT_SLA_ACK)
-			err = i2c_send_data(0);
-		else
-			uart_printstrn(0, "ERR: send slaW!");
-
-		if (err == TW_MT_DATA_ACK) {
-			err = i2c_send_start();
-
-			if (err == TW_REP_START)
-				err = i2c_send_sla_r();
-
-			if (err == TW_MR_SLA_ACK)
-				err = i2c_send_ack();
-
-			if (err == TW_MR_DATA_ACK) {
-				tempr = TWDR << 8;
-				err = i2c_send_nack();
-			}
-
-			if (err == TW_MR_DATA_NACK) {
-				tempr |= TWDR;
-			} else {
-				uart_printstrn(0, "ERR: recv DATA!");
-			}
+		if (tcn75_read_config_reg(&cfg)) {
+			uart_printstrn(0, "Error reading conf reg!");
 		} else {
-			uart_printstrn(0, "ERR: send DATA!");
+			uart_printstrn(0, "Config reg in hex");
+			string = itoa(cfg, string, 16);
+			uart_printstrn(0, string);
 		}
 
-		i2c_send_stop();
+		temp = tcn75_read_temperature();
 
-		temp = tempr/256;
-		string = itoa(tempr, string, 10);
-		uart_printstrn(0, string);
-		string = dtostrf(temp, 3, 5, string);
-		uart_printstrn(0, string);
-		string = itoa(err, string, 16);
-		uart_printstrn(0, string);
+		if (temp == -99) {
+			uart_printstrn(0, "Error reading temp!");
+		} else {
+			uart_printstrn(0, "temp");
+			string = dtostrf(temp, 3, 5, string);
+			uart_printstrn(0, string);
+		}
+
 		_delay_ms(1000);
-    }
+	}
 
 	free(string);
 	return(0);

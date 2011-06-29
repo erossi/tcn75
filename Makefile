@@ -14,28 +14,29 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 PRG_NAME = tnc75
-MCU = atmega164p
+#MCU = atmega164p
+MCU = atmega1284p
 OPTLEV = 2
 FCPU = 1000000UL
 PWD = $(shell pwd)
 INC = -I/usr/lib/avr/include/
 
 CFLAGS = $(INC) -Wall -Wstrict-prototypes -pedantic -mmcu=$(MCU) -O$(OPTLEV) -D F_CPU=$(FCPU)
-LFLAGS =
+LFLAGS = -lm
 
 PRGNAME = $(PRG_NAME)
 GIT_TAG = "Unknown"
 # Uncomment if git tag is in use
 #GIT_TAG = "$(shell git describe --tags)"
-#PRGNAME = $(PRG_NAME)_$(GIT_TAG)
+PRGNAME = $(PRG_NAME)_$(GIT_TAG)
 
 AR = avr-ar
 CC = avr-gcc
 
 DUDEPORT = /dev/ttyUSB0
 DUDEDEV = stk500v2
-#DUDEPORT = usb
-#DUDEDEV = avrispmkII
+DUDEPORT = usb
+DUDEDEV = avrispmkII
 # Use sudo for USB avrispmkII
 DUDE = sudo avrdude -c $(DUDEDEV) -p $(MCU) -P $(DUDEPORT) -e -U flash:w:$(PRGNAME).hex
 
@@ -45,7 +46,7 @@ SIZE = avr-size
 
 REMOVE = rm -f
 
-objects = uart.o
+objects = uart.o i2c.o tcn75.o
 
 .PHONY: clean indent
 .SILENT: help
