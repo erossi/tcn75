@@ -156,10 +156,11 @@ uint8_t i2c_master_read_b(const uint8_t addr, uint8_t *byte)
  * \param pre-allocated word.
  * \return 1 - value OK, 0 - Error.
  */
-uint8_t i2c_master_read_w(const uint8_t addr, uint8_t *msb, uint8_t *lsb)
+uint8_t i2c_master_read_w(const uint8_t addr, uint16_t *code)
 {
 	uint8_t err;
 
+	*code = 0;
 	err = i2c_send(START, 0);
 
 	if ((err == TW_START) || (err == TW_REP_START))
@@ -171,14 +172,14 @@ uint8_t i2c_master_read_w(const uint8_t addr, uint8_t *msb, uint8_t *lsb)
 	}
 
 	if (err == TW_MR_DATA_ACK) {
-		/* read the first data */
-		*msb = TWDR;
+		/* read the first data msb */
+		*code = (TWDR << 8);
 		err = i2c_send(ACK, 0);
 	}
 
 	if (err == TW_MR_DATA_ACK) {
-		/* read a byte */
-		*lsb = TWDR;
+		/* read lsb */
+		*code |= TWDR;
 		err = i2c_send(NACK, 0);
 	}
 

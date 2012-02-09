@@ -63,9 +63,11 @@ void tcn75_init(void)
 	tcn75_write_config_reg(TCN_CONF);
 }
 
+/*! read the temperature and return it in a float
+ */
 float tcn75_read_temperature(void)
 {
-	uint8_t msb, lsb;
+	uint16_t code;
 	float temp;
 
 	temp = -99;
@@ -75,10 +77,11 @@ float tcn75_read_temperature(void)
 	if (i2c_master_send_b(ADDR, 0)) {
 		/* error */
 	} else {
-		if (i2c_master_read_w(ADDR, &msb, &lsb)) {
+		if (i2c_master_read_w(ADDR, &code)) {
 			/* Error */
 		} else {
-			temp = ((msb << 4) | (lsb >> 4))/16.0;
+			/* casting uint16 to int16 */
+			temp = (int16_t)code / 256.0;
 		}
 	}
 
